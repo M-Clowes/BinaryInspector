@@ -14,6 +14,7 @@ public static class BinaryInspector
         long fileSize = new FileInfo(fileName).Length;
         long maxPageCount    = (fileSize + PAGE_SIZE - 1) / PAGE_SIZE;
         long pageNum         = 0;
+        int maxDigits        = maxPageCount == 0 ? 1 : (int)Math.Log10(maxPageCount) + 1;
 
         using var stream = File.OpenRead(fileName); 
 
@@ -37,32 +38,62 @@ public static class BinaryInspector
             PrintBytesPage(stream, pageNum);
 
             Console.WriteLine($"{ TABLE_COLOR }\u2514{ offsetBar }\u2534{ bytesBar }\u2534{ asciiBar }\u2518");
-            Console.WriteLine($"{ RESET_COLOR }<={ NULL_BYTES_COLOR } Page { pageNum + 1 } / { maxPageCount } (ESC to exit) { RESET_COLOR }=>");
+            Console.WriteLine($"{ RESET_COLOR }<= { NULL_BYTES_COLOR }Page { pageNum + 1 } / { maxPageCount }{ RESET_COLOR } =>");
+            Console.WriteLine(
+                $"{ NULL_BYTES_COLOR }Press "             +
+                $"{ RESET_COLOR }LeftArrow "              +
+                $"{ NULL_BYTES_COLOR }to go back, "       +
+                $"{ RESET_COLOR }RightArrow "             +
+                $"{ NULL_BYTES_COLOR }to go forward or " +
+                $"{ RESET_COLOR }ESC "                    +
+                $"{ NULL_BYTES_COLOR }to quit."
+            );
+            Console.Write($"Seek page:{ RESET_COLOR } ");
 
+            var buf = new char[maxDigits];
+            int len = 0;
             while (true)
             {
                 input = Console.ReadKey(true);
 
-                if (input.Key == ConsoleKey.LeftArrow ||
-                    input.Key == ConsoleKey.A         ||
-                    input.Key == ConsoleKey.B         ||
-                    input.Key == ConsoleKey.W)
+                switch (input.Key)
                 {
-                    pageNum = Math.Max(pageNum - 1, 0);
-                    break;
+                    case ConsoleKey.Escape:
+                        break;
+                    
+                    case ConsoleKey.Backspace:
+                        if (len > 0)
+                        {
+                            Console.Write("\b \b");
+                            buf[--len] = ' ';
+                        }
+                        continue;
+
+                    case ConsoleKey.Enter:
+                        var page = 0;
+                        for (var i = 0; i < len; ++i)
+                            page = page * 10 + (buf[i] - '0');
+                        pageNum = Math.Clamp(page - 1, 0, maxPageCount - 1);
+                        break;
+
+                    case ConsoleKey.LeftArrow:
+                        pageNum = Math.Max(pageNum - 1, 0);
+                        break;
+
+                    case ConsoleKey.RightArrow:
+                        pageNum = Math.Min(pageNum + 1, maxPageCount - 1);
+                        break;
+
+                    default:
+                        if (char.IsDigit(input.KeyChar) && len < buf.Length)
+                        {
+                            buf[len++] = input.KeyChar;
+                            Console.Write(input.KeyChar);
+                        }
+                        continue;
                 }
-                else if (input.Key == ConsoleKey.RightArrow ||
-                         input.Key == ConsoleKey.D          ||
-                         input.Key == ConsoleKey.N          ||
-                         input.Key == ConsoleKey.S)
-                {
-                    pageNum = Math.Min(pageNum + 1, maxPageCount - 1);
-                    break;
-                }
-                else if (input.Key == ConsoleKey.Escape)
-                {
-                    break;
-                }
+
+                break;
             }
         } while (input.Key != ConsoleKey.Escape);
     }
